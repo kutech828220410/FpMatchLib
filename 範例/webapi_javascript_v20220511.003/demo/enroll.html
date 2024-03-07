@@ -1,0 +1,109 @@
+<html>
+<head>
+    <!-- http version  -->
+    <script src="../jsLib/jquery/jquery.min.js" ></script>
+    <script src="../jsLib/JSON/json2.js" ></script>
+    <script src="../fpsdk/HttpServerCommunicator.js" ></script>
+
+    <!-- websocket version  -->
+    <script src="../fpsdk/WsServerCommunicator.js" ></script>
+
+    <!-- fp sdk  -->
+    <script src="../fpsdk/NcryFpSdk.js" ></script>
+</head>
+<body>
+<div id="console"></div>
+
+
+<script>
+    var lastStateCode = -1
+    function enrolling(handle){
+
+        Fp.enroll(handle, function (returnObj){
+
+            var stateCode = returnObj.stateCode
+
+            if( stateCode == Fp.RT_SUCCESS ){
+                Fp.log( "template size:" + returnObj.featureLen +  ", template:" + returnObj.feature );
+                Fp.closeDevice(handle, function (returnObj){
+                    if( returnObj.retCode == Fp.RT_SUCCESS){
+                        Fp.log("device closed" );
+                    }
+                })
+            }else if(stateCode == Fp.RT_FP_CANCEL) {
+                Fp.log("enroll task cancelled" );
+            }else{
+
+                if( lastStateCode != stateCode ){
+                    lastStateCode = stateCode
+
+                    switch (stateCode) {
+                        case -1:
+                            break;
+
+                        case Fp.RT_NEED_FIRST_SWEEP:
+                            Fp.log("##First Press" );
+                            break;
+
+                        case Fp.RT_NEED_SECOND_SWEEP:
+                            Fp.log("##Second Press" );
+                            break;
+
+                        case Fp.RT_NEED_THIRD_SWEEP:
+                            Fp.log("##Third Press" );
+                            break;
+
+                        case Fp.RT_NEED_RELEASE_FINGER:
+                            Fp.log("##Please leave finger" );
+                            break;
+
+                        case Fp.RT_BAD_QUALITY:
+                            Fp.log("##Bad fingerprint quality, please retry" );
+                            break;
+
+
+                    }
+                }
+
+
+                Fp.sleep(200)
+                enrolling(handle)
+            }
+        })
+    }
+
+    Fp.log("fingerprint service start connect" );
+    Fp.connect(function (){
+        Fp.log("fingerprint service connect succ" );
+
+        Fp.setDeviceType(Fp.SERIAL_DEVICE, function (){
+            Fp.openDevice(-1, function (returnObj){
+                handle = returnObj.handle
+                if( handle > 0 ){
+                    Fp.log("openDevice succ" );
+                    enrolling(handle)
+                }else{
+                    Fp.log("openDevice failed" );
+                }
+            })
+        })
+    }, function (jqXHR, textStatus, errorThrown){
+        Fp.log("connect fingerprint service failed")
+        Fp.log("textStatus:" + textStatus + ", errorThrown:" + errorThrown );
+    })
+
+
+
+
+
+</script>
+
+
+
+
+
+
+
+</body>
+</html>
+

@@ -1,0 +1,201 @@
+<html>
+<head>
+	<script src="msrcrypto.js"></script>
+</head>
+<body>
+<div id="console" ></div>
+<script>
+var console = document.getElementById("console");
+console.append = function(str){
+	this.innerHTML += str + "<br/>";
+}
+
+console.append("begin,go");
+console.append("begin,good");
+
+
+var crypto =  window.crypto /*native*/ || window.msCrypto /*IE11 native*/ || window.msrCrypto; /*polyfill*/
+
+function TextEncoder(){}
+TextEncoder.prototype.encode = function( str ){
+	return crypto.textToBytes(str);
+}
+
+function TextDecoder(){}
+TextDecoder.prototype.decode = function( bitAry ){
+	return crypto.bytesToText(bitAry);
+}
+
+var enc = new TextEncoder();
+var dec = new TextDecoder();
+
+
+var encryptedText;
+var decryptedText;
+
+
+var pemEncodedKey = "-----BEGIN PRIVATE KEY-----"
++"MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDD0tPV/du2vftjvXj1t/gXTK39sNBVrOAEb/jKzXae+Xa0H+3LhZaQIQNMfACiBSgIfZUvEGb+7TqXWQpoLoFR/R7MvGWcSk98JyrVtveD8ZmZYyItSY7m2hcasqAFiKyOouV5vzyRe87/lEyzzBpF3bQQ4IDaQu+K9Hj5fKuU6rrOeOhsdnJc+VdDQLScHxvMoLZ9Vtt+oK9J4/tOLwr4CG8khDlBURcBY6gPcLo3dPU09SW+6ctX2cX4mkXx6O/0mmdTmacr/vu50KdRMleFeZYOWPAEhhMfywybTuzBiPVIZVP8WFCSKNMbfi1S9A9PdBqnebwwHhX3/hsEBt2BAgMBAAECggEABEI1P6nf6Zs7mJlyBDv+Pfl5rjL2cOqLy6TovvZVblMkCPpJyFuNIPDK2tK2i897ZaXfhPDBIKmllM2Hq6jZQKB110OAnTPDg0JxzMiIHPs32S1d/KilHjGff4Hjd4NXp1l1Dp8BUPOllorR2TYm2x6dcCGFw9lhTr8O03Qp4hjn84VjGIWADYCk83mgS4nRsnHkdiqYnWx1AjKlY51yEK6RcrDMi0Th2RXrrINoC35sVv+APt2rkoMGi52RwTEseA1KZGFrxjq61ReJif6p2VXEcvHeX6CWLx014LGk43z6Q28P6HgeEVEfIjyqCUea5Du/mYb/QsRSCosXLxBqwQKBgQD1+fdC9ZiMrVI+km7Nx2CKBn8rJrDmUh5SbXn2MYJdrUd8bYNnZkCgKMgxVXsvJrbmVOrby2txOiqudZkk5mD3E5O/QZWPWQLgRu8ueYNpobAX9NRgNfZ7rZD+81vh5MfZiXfuZOuzv29iZhU0oqyZ9y75eHkLdrerNkwYOe5aUQKBgQDLzapDi1NxkBgsj9iiO4KUa7jvD4JjRqFy4Zhj/jbQvlvM0F/uFp7sxVcHGx4r11C+6iCbhX4u+Zuu0HGjT4d+hNXmgGyxR8fIUVxOlOtDkVJa5sOBZK73/9/MBeKusdmJPRhalZQfMUJRWIoEVDMhfg3tW/rBj5RYAtP2dTVUMQKBgDs8yr52dRmT+BWXoFWwaWB0NhYHSFz/c8v4D4Ip5DJ5M5kUqquxJWksySGQa40sbqnD05fBQovPLU48hfgr/zghn9hUjBcsoZOvoZR4sRw0UztBvA+7jzOz1hKAOyWIulR6Vca0yUrNlJ6G5R56+sRNkiOETupi2dLCzcqb0PoxAoGAZyNHvTLvIZN4iGSrjz5qkM4LIwBIThFadxbv1fq6pt0O/BGf2o+cEdq0diYlGK64cEVwBwSBnSg4vzlBqRIAUejLjwEDAJyA4EE8Y5A9l04dzV7nJb5cRak6CrgXxay/mBJRFtaHxVlaZGxYPGSYE6UFS0+3EOmmevvDZQBf4qECgYEA0ZF6Vavz28+8wLO6SP3w8NmpHk7K9tGEvUfQ30SgDx4G7qPIgfPrbB4OP/E0qCfsIImi3sCPpjvUMQdVVZyPOIMuB+rV3ZOxkrzxEUOrpOpR48FZbL7RN90yRQsAsrp9e4iv8QwB3VxLe7X0TDqqnRyqrc/osGzuS2ZcHOKmCU8="
++"-----END PRIVATE KEY-----";
+
+  /*
+  The unwrapped signing key.
+  */
+  var signingKey;
+
+  var signButton = document.querySelector(".pkcs8 .sign-button");
+
+  /*
+  Convert a string into an ArrayBuffer
+  from https://developers.google.com/web/updates/2012/06/How-to-convert-ArrayBuffer-to-and-from-String
+  */
+  function str2ab(str) {
+    var buf = new ArrayBuffer(str.length);
+    var bufView = new Uint8Array(buf);
+    for (var i = 0, strLen = str.length; i < strLen; i++) {
+      bufView[i] = str.charCodeAt(i);
+    }
+    return buf;
+  }
+
+  /*
+  Import a PEM encoded RSA private key, to use for RSA-PSS signing.
+  Takes a string containing the PEM encoded key, and returns a Promise
+  that will resolve to a CryptoKey representing the private key.
+  */
+  function importPrivateKey(pem) {
+    // fetch the part of the PEM string between header and footer
+    var pemHeader = "-----BEGIN PRIVATE KEY-----";
+    var pemFooter = "-----END PRIVATE KEY-----";
+    var pemContents = pem.substring(pemHeader.length, pem.length - pemFooter.length);
+    // base64 decode the string to get the binary data
+    var binaryDerString = crypto.fromBase64(pemContents);// window.atob(pemContents);
+    // convert from a binary string to an ArrayBuffer
+    var binaryDer = str2ab(binaryDerString);
+
+    return window.crypto.subtle.importKey(
+      "jwk",
+      binaryDer,
+      {
+        name: "RSA-OAEP",
+        // Consider using a 4096-bit key for systems that require long-term security
+        modulusLength: 2048,
+        publicExponent: new Uint8Array([1, 0, 1]),
+        hash: "SHA-256",
+      },
+      true,
+      ["decrypt"]
+    );
+  }
+
+  importPrivateKey(pemEncodedKey).then(function(privateKey){
+    //returns a publicKey (or privateKey if you are importing a private key)
+	console.append("  importPrivateKey.then " +privateKey);
+	
+	decryptedText = crypto.subtle.decrypt({
+						name: "RSA-OAEP"
+						},
+						privateKey,
+						encodedMessage
+					);
+					
+	console.append(dec.decode(encryptedText));
+
+});
+
+
+
+window.crypto.subtle.importKey(
+    "jwk", //can be "jwk" (public or private), "spki" (public only), or "pkcs8" (private only)
+    {   //this is an example jwk key, other key types are Uint8Array objects
+        kty: "RSA",
+        e: "AQAB",
+		//n: "vGO3eU16ag9zRkJ4AK8ZUZrjbtp5xWK0LyFMNT8933evJoHeczexMUzSiXaLrEFSyQZortk81zJH3y41MBO_UFDO_X0crAquNrkjZDrf9Scc5-MdxlWU2Jl7Gc4Z18AC9aNibWVmXhgvHYkEoFdLCFG-2Sq-qIyW4KFkjan05IE",
+		n: "MFswDQYJKoZIhvcNAQEBBQADSgAwRwJAaO/H0DrYEWxiEi+q8XweFBK0bk4W2u8lHAP+RcqsKhm3qXTFEAuVFleYoxZY76zULk75Y1K6NJFm3EtfzjrQ6QIDAQAB",		
+        alg: "RSA-OAEP-256",
+        ext: true,
+    },
+    {   //these are the algorithm options
+        name: "RSA-OAEP",
+        hash: {name: "SHA-256"}, //can be "SHA-1", "SHA-256", "SHA-384", or "SHA-512"
+    },
+    false, //whether the key is extractable (i.e. can be used in exportKey)
+    ["encrypt"] //"encrypt" or "wrapKey" for public key import or
+                //"decrypt" or "unwrapKey" for private key imports
+)
+.then(function(publicKey){
+    //returns a publicKey (or privateKey if you are importing a private key)
+	console.append(publicKey);
+	
+	var encodedMessage = enc.encode('hello');
+	encryptedText = crypto.subtle.encrypt({
+						name: "RSA-OAEP"
+						},
+						publicKey,
+						encodedMessage
+					);
+					
+	console.append(encryptedText);
+
+});
+
+
+window.crypto.subtle.importKey(
+    "jwk", //can be "jwk" (public or private), "spki" (public only), or "pkcs8" (private only)
+    {   //this is an example jwk key, other key types are Uint8Array objects
+        kty: "RSA",
+        e: "AQAB",
+        n: "MIIBOAIBAAJAaO/H0DrYEWxiEi+q8XweFBK0bk4W2u8lHAP+RcqsKhm3qXTFEAuVFleYoxZY76zULk75Y1K6NJFm3EtfzjrQ6QIDAQABAkBNWmPalWXtAg4RBd5nAG1Tsq4amamzXZHnYvIvFEVxCmv00df9BspLHAV/lh3OJ/CWfXjEqbPn++lBW4eeVLph"
+			+"AiEAvVrsgr2m0+UMz1od3XgHy3GcF2aDsYMMPBz9W3fc1B0CIQCN3qtK4W8BucOEmZ1R01TKgz7YxudX39iRgvGYZS5+PQIgQPxfh09HXhmSF+e5sDRtmGjZRT6tm9J5"
+			+"9HeOjEHKzBECIGT0SxhiC0hDFKrLVXPg2rmxY4uHHyEdHVOOxrUXa1pRAiAUGj5QehSnR9jV0hD74Bit+3f3de7q0fWOfTPLM3ZAtA==",
+        alg: "RSA-OAEP-256",
+        ext: true,
+    },
+    {   //these are the algorithm options
+        name: "RSA-OAEP",
+        hash: {name: "SHA-256"}, //can be "SHA-1", "SHA-256", "SHA-384", or "SHA-512"
+    },
+    false, //whether the key is extractable (i.e. can be used in exportKey)
+    ["decrypt"] //"encrypt" or "wrapKey" for public key import or
+                //"decrypt" or "unwrapKey" for private key imports
+)
+.then(function(privateKey){
+    //returns a publicKey (or privateKey if you are importing a private key)
+	console.append(privateKey);
+	
+	decryptedText = crypto.subtle.decrypt({
+						name: "RSA-OAEP"
+						},
+						privateKey,
+						encryptedText
+					);
+					
+	console.append(dec.decode(encryptedText));
+
+});
+
+
+
+
+
+// .catch(function(err){
+//     console.append(err);
+// });
+
+
+// console.append(JSON.stringify(keyPair));
+
+
+
+// var decryptedText = crypto.subtle.decrypt({
+//   name: "RSA-OAEP"
+// },
+// privateKey,
+// encryptedText
+// )
+// console.append(decryptedText);
+// console.append(dec.decode(decryptedText));
+
+</script>
+</body>
+</html>

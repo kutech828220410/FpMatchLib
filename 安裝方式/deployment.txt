@@ -1,0 +1,17 @@
+
+@demploy step:
+#step 1
+    copy fpWebSrv file to any location
+
+#step 2: install it as system service
+    fpWebSrv install
+
+#step 3: start serivce
+    fpWebSrv start
+
+@stop service
+    fpWebSrv stop
+
+@remove service
+   fpWebSrv remove
+

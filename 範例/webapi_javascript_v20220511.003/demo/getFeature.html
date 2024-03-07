@@ -1,0 +1,103 @@
+<html>
+    <head>
+        <!-- http version  -->
+        <script src="../jsLib/jquery/jquery.min.js" ></script>
+        <script src="../jsLib/JSON/json2.js" ></script>
+        <script src="../fpsdk/HttpServerCommunicator.js" ></script>
+
+        <!-- websocket version  -->
+        <script src="../fpsdk/WsServerCommunicator.js" ></script>
+
+        <!-- fp sdk  -->
+        <script src="../fpsdk/NcryFpSdk.js" ></script>
+    </head>
+    <body>
+
+    <div id="console"></div>
+
+<script>
+
+var lastStateCode = -1
+function getFeature(handle){
+
+    Fp.log("please press finger");
+    Fp.getFeature(handle, function (returnObj){
+
+        var stateCode = returnObj.stateCode
+
+        if( stateCode == Fp.RT_SUCCESS ){
+            Fp.log( "feature size:" + returnObj.featureLen +  ", feature:" + returnObj.feature)
+            Fp.closeDevice(handle, function (returnObj){
+                if( returnObj.retCode == Fp.RT_SUCCESS){
+                    Fp.log("device closed")
+                }
+            })
+        }else if(stateCode == Fp.RT_FP_CANCEL) {
+            Fp.log("getFeature task cancelled")
+        }else{
+
+            if( lastStateCode != stateCode ){
+                lastStateCode = stateCode
+
+                switch (stateCode) {
+                    case -1:
+                        break;
+                    case Fp.RT_BAD_QUALITY:
+                        Fp.log("##Bad fingerprint quality, please retry")
+                        break;
+                    default:
+                        Fp.log("stateCode:", stateCode)
+
+                }
+            }
+
+            Fp.sleep(200)
+            getFeature(handle)
+        }
+    })
+}
+
+Fp.connect(function (){
+    Fp.log("fingerprint service connect succ")
+
+    Fp.setDeviceType(Fp.SERIAL_DEVICE, function (){
+
+        // 连接指纹仪
+        // Fp.deviceCount(function (returnObj){
+        //     Fp.log("device count:" + returnObj.count)
+        //
+        //     if( returnObj.count > 0 ){
+        //     }else{
+        //         Fp.log("Please insert fingerprint")
+        //     }
+        // })
+
+
+        Fp.log("start open device");
+        Fp.openDevice(-1, function (returnObj){
+            handle = returnObj.handle;
+            if( handle > 0 ){
+                Fp.log("openDevice succ");
+                getFeature(handle);
+            }else{
+                Fp.log("openDevice failed");
+            }
+        })
+    })
+})
+
+
+
+
+
+ </script>
+
+
+
+
+
+
+
+    </body>
+</html>
+
