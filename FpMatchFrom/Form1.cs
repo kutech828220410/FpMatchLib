@@ -56,10 +56,18 @@ namespace FpMatchFrom
         }
         private void Button_Match_Click(object sender, EventArgs e)
         {
-            int temp = fpMatchSoket.Match(textBox_FeatureTemplate.Text, textBox_FeatureValue.Text);
+            bool flag = fpMatchSoket.Match(textBox_FeatureTemplate.Text, textBox_FeatureValue.Text);
             this.Invoke(new Action(delegate
             {
-                label_Score.Text = $"[分數]{temp}";
+                label_Score.Text = $"{(flag ? "成功":"失敗")}";
+                if(flag)
+                {
+                    label_Score.BackColor = Color.Green;
+                }
+                else
+                {
+                    label_Score.BackColor = Color.Red;
+                }
             }));
 
         }

@@ -147,7 +147,7 @@ namespace FpMatchFrom
             this.label_Score.Name = "label_Score";
             this.label_Score.Size = new System.Drawing.Size(147, 58);
             this.label_Score.TabIndex = 10;
-            this.label_Score.Text = "[分數]-----";
+            this.label_Score.Text = "------";
             this.label_Score.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             // 
             // Form1
