@@ -40,6 +40,8 @@ namespace FpMatchLib
     {
         NONE = 0x00,
         FAIL = 0x01,
+        READY = 0x02,
+        UNREADY = 0x02,
         RT_NEED_SWEEP = -1,
 
         RT_NEED_FIRST_SWEEP = 0xFFF1,
@@ -100,16 +102,21 @@ namespace FpMatchLib
         public int DeviceIndex = -1;
         public int Hanndle = -1;
         private bool _abort = false;
-
+        public stateCode StateCode = stateCode.NONE;
         public void Init(string url)
         {
             socketClient = new Net.SocketClient(url);        
         }
         public bool Open()
         {
+            if (socketClient == null) socketClient = new Net.SocketClient($@"127.0.0.1:19002/ws");
             bool flag_OK = true;
             try
             {
+                if (this.Hanndle != -1)
+                {
+                    if (CloseDevice() == false) flag_OK = false;
+                }
                 if (Connect() == false) flag_OK = false;
                 if (SetDeviceType() == false) flag_OK = false;
                 if (OpenDevice() == false) flag_OK = false;
@@ -126,6 +133,26 @@ namespace FpMatchLib
             }
       
         }
+        public async Task<bool> OpenAsync()
+        {
+            bool flag_OK = true;
+            try
+            {
+                if (await ConnectAsync() == false) flag_OK = false;
+                if (await SetDeviceTypeAsync() == false) flag_OK = false;
+                if (await OpenDeviceAsync() == false) flag_OK = false;
+                return flag_OK;
+            }
+            catch
+            {
+                flag_OK = false;
+                return flag_OK;
+            }
+            finally
+            {
+                Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{new System.Diagnostics.StackTrace().GetFrame(0).GetMethod().DeclaringType.Name}] FpMatchSoket {(flag_OK ? "sucess" : "failed")}!");
+            }
+        }
         public bool Match(string registerTemplate, string queryFeature )
         {
             MyTimerBasic myTimerBasic = new MyTimerBasic(50000);
@@ -135,9 +162,10 @@ namespace FpMatchLib
             int nRet = 0;
             int similarity = 0;
             nRet = FPMatch(templateBytes, featureBytes, secLevel, ref similarity);
-            if ((nRet == RTC_SUCCESS) && (similarity > 0))
+            if ((nRet == RTC_SUCCESS) && (similarity > 800))
             {
                 if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] match success,similarity:{similarity} ,{myTimerBasic.ToString()}");
+             
                 return true;
             }
             else
@@ -166,32 +194,33 @@ namespace FpMatchLib
                         CloseDevice();
                         break;
                     }
-                    stateCode _stateCode = enroll(ref fpMatchClass);
-                    if (_stateCode == stateCode.RT_NEED_FIRST_SWEEP)
+                    StateCode = enroll(ref fpMatchClass);
+                    if (StateCode == stateCode.RT_NEED_FIRST_SWEEP)
                     {
                         if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] ##First Press");
                     }
-                    if (_stateCode == stateCode.RT_NEED_SECOND_SWEEP)
+                    if (StateCode == stateCode.RT_NEED_SECOND_SWEEP)
                     {
                         if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] ##Second Press");
                     }
-                    if (_stateCode == stateCode.RT_NEED_THIRD_SWEEP)
+                    if (StateCode == stateCode.RT_NEED_THIRD_SWEEP)
                     {
                         if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] ##Third Press");
                     }
-                    if (_stateCode == stateCode.RT_NEED_RELEASE_FINGER)
+                    if (StateCode == stateCode.RT_NEED_RELEASE_FINGER)
                     {
                         if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] ##Please leave finger");
                     }
-                    if (_stateCode == stateCode.NONE)
+                    if (StateCode == stateCode.NONE)
                     {
                         if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] featureLen:{fpMatchClass.featureLen}");
                         if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] feature:{fpMatchClass.feature}");
+                        StateCode = stateCode.READY;
                         return fpMatchClass;
                     }
-                    if (_stateCode == stateCode.FAIL)
+                    if (StateCode == stateCode.FAIL)
                     {
-                        if (_stateCode == stateCode.NONE)
+                        if (StateCode == stateCode.NONE)
                             return new FpMatchClass();
                     }
                      System.Threading.Thread.Sleep(50);
@@ -222,22 +251,23 @@ namespace FpMatchLib
                         CloseDevice();
                         break;
                     }
-                    stateCode _stateCode = getFeature(ref fpMatchClass);
-   
-                    if (_stateCode == stateCode.NONE)
+                    StateCode = getFeature(ref fpMatchClass);
+
+                    if (StateCode == stateCode.NONE)
                     {
                         if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] featureLen:{fpMatchClass.featureLen}");
                         if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] feature:{fpMatchClass.feature}");
+                        StateCode = stateCode.READY;
                         return fpMatchClass;
                     }
-                    if (_stateCode == stateCode.RT_NEED_SWEEP)
+                    if (StateCode == stateCode.RT_NEED_SWEEP)
                     {
                         if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] ##Please press finger");
                     }
-                    
-                    if (_stateCode == stateCode.FAIL)
+
+                    if (StateCode == stateCode.FAIL)
                     {
-                        if (_stateCode == stateCode.NONE)
+                        if (StateCode == stateCode.NONE)
                             return new FpMatchClass();
                     }
                     System.Threading.Thread.Sleep(50);
@@ -253,12 +283,30 @@ namespace FpMatchLib
             }
             return new FpMatchClass();
         }
+        public FpMatchClass GetFeatureOnce()
+        {
+            IsBusy = true;
+            _abort = false;
+            FpMatchClass fpMatchClass = new FpMatchClass();
+            StateCode = getFeature(ref fpMatchClass);
+            if (StateCode == stateCode.NONE)
+            {
+                if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] featureLen:{fpMatchClass.featureLen}");
+                if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] feature:{fpMatchClass.feature}");
+         
+                return fpMatchClass;
+            }
+            StateCode = stateCode.READY;
+            return null;
+            
+        }
         public bool Connect()
         {
             FpMatchClass fpMatch = new FpMatchClass();
             fpMatch.cmd = (int)CmdType.Connect;
             string json = socketClient.PostJson(fpMatch.JsonSerializationt());
             FpMatchClass fpMatch_result = json.JsonDeserializet<FpMatchClass>();
+            if (fpMatch_result == null) return false;
             if ((retCode)fpMatch_result.retCode == retCode.RT_SUCCESS)
             {
                 if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] FpMatchSoket {((retCode)fpMatch_result.retCode).GetEnumName()}");
@@ -270,6 +318,24 @@ namespace FpMatchLib
                 return false;
             }
         }
+        public async Task<bool> ConnectAsync()
+        {
+            FpMatchClass fpMatch = new FpMatchClass();
+            fpMatch.cmd = (int)CmdType.Connect;
+            string json = await socketClient.PostJsonAsync(fpMatch.JsonSerializationt());
+            FpMatchClass fpMatch_result = json.JsonDeserializet<FpMatchClass>();
+            if (fpMatch_result == null) return false;
+            if ((retCode)fpMatch_result.retCode == retCode.RT_SUCCESS)
+            {
+                if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{ new System.Diagnostics.StackTrace().GetFrame(0).GetMethod().DeclaringType.Name}] FpMatchSoket {((retCode)fpMatch_result.retCode).GetEnumName()}");
+                return true;
+            }
+            else
+            {
+                if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{ new System.Diagnostics.StackTrace().GetFrame(0).GetMethod().DeclaringType.Name}] FpMatchSoket {((retCode)fpMatch_result.retCode).GetEnumName()}");
+                return false;
+            }
+        }
         public bool SetDeviceType()
         {
             FpMatchClass fpMatch = new FpMatchClass();
@@ -277,6 +343,7 @@ namespace FpMatchLib
             fpMatch.裝置類別 = 1;
             string json = socketClient.PostJson(fpMatch.JsonSerializationt());
             FpMatchClass fpMatch_result = json.JsonDeserializet<FpMatchClass>();
+            if (fpMatch_result == null) return false;
             if ((retCode)fpMatch_result.retCode == retCode.RT_SUCCESS)
             {
                 if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] FpMatchSoket {((retCode)fpMatch_result.retCode).GetEnumName()}");
@@ -285,6 +352,25 @@ namespace FpMatchLib
             else
             {
                 if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] FpMatchSoket {((retCode)fpMatch_result.retCode).GetEnumName()}");
+                return false;
+            }
+        }
+        public async Task<bool> SetDeviceTypeAsync()
+        {
+            FpMatchClass fpMatch = new FpMatchClass();
+            fpMatch.cmd = (int)CmdType.SetDeviceType;
+            fpMatch.裝置類別 = 1;
+            string json = await socketClient.PostJsonAsync(fpMatch.JsonSerializationt());
+            FpMatchClass fpMatch_result = json.JsonDeserializet<FpMatchClass>();
+            if (fpMatch_result == null) return false;
+            if ((retCode)fpMatch_result.retCode == retCode.RT_SUCCESS)
+            {
+                if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{new System.Diagnostics.StackTrace().GetFrame(0).GetMethod().DeclaringType.Name}] FpMatchSoket {((retCode)fpMatch_result.retCode).GetEnumName()}");
+                return true;
+            }
+            else
+            {
+                if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{new System.Diagnostics.StackTrace().GetFrame(0).GetMethod().DeclaringType.Name}] FpMatchSoket {((retCode)fpMatch_result.retCode).GetEnumName()}");
                 return false;
             }
         }
@@ -328,10 +414,12 @@ namespace FpMatchLib
             fpMatch.裝置號碼 = -1;
             string json = socketClient.PostJson(fpMatch.JsonSerializationt());
             FpMatchClass fpMatch_result = json.JsonDeserializet<FpMatchClass>();
+            if (fpMatch_result == null) return false;
             if ((retCode)fpMatch_result.retCode == retCode.RT_SUCCESS)
             {
                 if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] FpMatchSoket {((retCode)fpMatch_result.retCode).GetEnumName()}");
                 Hanndle = fpMatch_result.handle;
+                StateCode = stateCode.READY;
                 return true;
             }
             else
@@ -340,7 +428,29 @@ namespace FpMatchLib
                 return false;
             }
         }
-        private bool CloseDevice()
+        private async Task<bool> OpenDeviceAsync()
+        {
+            FpMatchClass fpMatch = new FpMatchClass();
+            fpMatch.cmd = (int)CmdType.OpenDevice;
+            fpMatch.裝置類別 = 1;
+            fpMatch.裝置號碼 = -1;
+
+            string json = await socketClient.PostJsonAsync(fpMatch.JsonSerializationt());
+            FpMatchClass fpMatch_result = json.JsonDeserializet<FpMatchClass>();
+            if (fpMatch_result == null) return false;
+            if ((retCode)fpMatch_result.retCode == retCode.RT_SUCCESS)
+            {
+                if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{new System.Diagnostics.StackTrace().GetFrame(0).GetMethod().DeclaringType.Name}] FpMatchSoket {((retCode)fpMatch_result.retCode).GetEnumName()}");
+                Hanndle = fpMatch_result.handle;
+                return true;
+            }
+            else
+            {
+                if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{new System.Diagnostics.StackTrace().GetFrame(0).GetMethod().DeclaringType.Name}] FpMatchSoket {((retCode)fpMatch_result.retCode).GetEnumName()}");
+                return false;
+            }
+        }
+        public bool CloseDevice()
         {
             FpMatchClass fpMatch = new FpMatchClass();
             fpMatch.cmd = (int)CmdType.CloseDevice;
@@ -348,19 +458,46 @@ namespace FpMatchLib
             fpMatch.裝置號碼 = -1;
             string json = socketClient.PostJson(fpMatch.JsonSerializationt());
             FpMatchClass fpMatch_result = json.JsonDeserializet<FpMatchClass>();
+            if (fpMatch_result == null) return false;
             if ((retCode)fpMatch_result.retCode == retCode.RT_SUCCESS)
             {
                 if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] FpMatchSoket {((retCode)fpMatch_result.retCode).GetEnumName()}");
                 Hanndle = -1;
+                StateCode = stateCode.UNREADY;
+
                 return true;
             }
             else
             {
                 if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] FpMatchSoket {((retCode)fpMatch_result.retCode).GetEnumName()}");
                 Hanndle = -1;
+                StateCode = stateCode.UNREADY;
+
                 return false;
             }
         }
-      
+        private async Task<bool> CloseDeviceAsync()
+        {
+            FpMatchClass fpMatch = new FpMatchClass();
+            fpMatch.cmd = (int)CmdType.CloseDevice;
+            fpMatch.裝置類別 = 1;
+            fpMatch.裝置號碼 = -1;
+
+            string json = await socketClient.PostJsonAsync(fpMatch.JsonSerializationt());
+            FpMatchClass fpMatch_result = json.JsonDeserializet<FpMatchClass>();
+            if (fpMatch_result == null) return false;
+            if ((retCode)fpMatch_result.retCode == retCode.RT_SUCCESS)
+            {
+                if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{new System.Diagnostics.StackTrace().GetFrame(0).GetMethod().Name}] FpMatchSoket {((retCode)fpMatch_result.retCode).GetEnumName()}");
+                Hanndle = -1;
+                return true;
+            }
+            else
+            {
+                if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{new System.Diagnostics.StackTrace().GetFrame(0).GetMethod().Name}] FpMatchSoket {((retCode)fpMatch_result.retCode).GetEnumName()}");
+                Hanndle = -1;
+                return false;
+            }
+        }
     }
 }

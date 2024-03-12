@@ -19,6 +19,7 @@ namespace FpMatchFrom
         public Form1()
         {
             FpMatchSoket.secLevel = 3;
+            FpMatchSoket.ConsoleWrite = true;
             InitializeComponent();
             this.Load += Form1_Load;
             this.button_Init.Click += Button_Init_Click;
@@ -105,9 +106,9 @@ namespace FpMatchFrom
          
         }
 
-        private void Button_Init_Click(object sender, EventArgs e)
-        {         
-            fpMatchSoket.Open();
+        async private void Button_Init_Click(object sender, EventArgs e)
+        {
+            await fpMatchSoket.OpenAsync();
         }
     }
 }
