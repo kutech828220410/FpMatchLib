@@ -109,16 +109,20 @@ namespace FpMatchLib
         }
         public bool Open()
         {
+            return Open(false);
+        }
+        public bool Open(bool flag_SetDeviceType)
+        {
             if (socketClient == null) socketClient = new Net.SocketClient($@"127.0.0.1:19002/ws");
             bool flag_OK = true;
             try
             {
                 if (this.Hanndle != -1)
                 {
-                    if (CloseDevice() == false) flag_OK = false;
+                    if (CloseDevice() == false) ;
                 }
                 if (Connect() == false) flag_OK = false;
-                if (SetDeviceType() == false) flag_OK = false;
+                if (SetDeviceType() == false || flag_SetDeviceType) flag_OK = false;
                 if (OpenDevice() == false) flag_OK = false;
                 return flag_OK;
             }
@@ -452,6 +456,7 @@ namespace FpMatchLib
         }
         public bool CloseDevice()
         {
+            StateCode = stateCode.UNREADY;
             FpMatchClass fpMatch = new FpMatchClass();
             fpMatch.cmd = (int)CmdType.CloseDevice;
             fpMatch.裝置類別 = 1;
@@ -463,7 +468,7 @@ namespace FpMatchLib
             {
                 if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] FpMatchSoket {((retCode)fpMatch_result.retCode).GetEnumName()}");
                 Hanndle = -1;
-                StateCode = stateCode.UNREADY;
+              
 
                 return true;
             }
@@ -471,7 +476,6 @@ namespace FpMatchLib
             {
                 if (ConsoleWrite) Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] FpMatchSoket {((retCode)fpMatch_result.retCode).GetEnumName()}");
                 Hanndle = -1;
-                StateCode = stateCode.UNREADY;
 
                 return false;
             }
