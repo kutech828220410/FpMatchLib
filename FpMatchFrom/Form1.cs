@@ -108,7 +108,7 @@ namespace FpMatchFrom
 
         async private void Button_Init_Click(object sender, EventArgs e)
         {
-            await fpMatchSoket.OpenAsync();
+            fpMatchSoket.Open();
         }
     }
 }

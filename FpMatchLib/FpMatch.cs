@@ -105,29 +105,40 @@ namespace FpMatchLib
         public stateCode StateCode = stateCode.NONE;
         public void Init(string url)
         {
-            socketClient = new Net.SocketClient(url);        
+            socketClient = new Net.SocketClient(url);
+            Net.SocketClient.ConsoleWrite = ConsoleWrite;
         }
         public bool Open()
         {
-            return Open(false);
+            return Open(true);
         }
         public bool Open(bool flag_SetDeviceType)
         {
-            if (socketClient == null) socketClient = new Net.SocketClient($@"127.0.0.1:19002/ws");
+         
             bool flag_OK = true;
             try
             {
+             
+                if (socketClient == null) socketClient = new Net.SocketClient($@"127.0.0.1:19002/ws");
+          
+               
+                socketClient.Open();
                 if (this.Hanndle != -1)
                 {
                     if (CloseDevice() == false) ;
                 }
                 if (Connect() == false) flag_OK = false;
-                if (SetDeviceType() == false || flag_SetDeviceType) flag_OK = false;
+                if(flag_SetDeviceType)
+                {
+                    if (SetDeviceType() == false) flag_OK = false;
+                }
+      
                 if (OpenDevice() == false) flag_OK = false;
                 return flag_OK;
             }
-            catch
+            catch(Exception e)
             {
+                Console.WriteLine($"{DateTime.Now.ToDateTimeString()} : [{System.Reflection.MethodBase.GetCurrentMethod().Name}] FpMatchSoket Exception:{e.Message}");
                 flag_OK = false;
                 return flag_OK;
             }
@@ -142,6 +153,13 @@ namespace FpMatchLib
             bool flag_OK = true;
             try
             {
+                socketClient.Close();
+                if (socketClient == null) socketClient = new Net.SocketClient($@"127.0.0.1:19002/ws");
+                socketClient.Open();
+                if (this.Hanndle != -1)
+                {
+                    if (CloseDevice() == false) ;
+                }
                 if (await ConnectAsync() == false) flag_OK = false;
                 if (await SetDeviceTypeAsync() == false) flag_OK = false;
                 if (await OpenDeviceAsync() == false) flag_OK = false;
@@ -392,6 +410,7 @@ namespace FpMatchLib
             fpMatch.handle = Hanndle;
             string json = socketClient.PostJson(fpMatch.JsonSerializationt());
             fpMatch = json.JsonDeserializet<FpMatchClass>();
+            if (fpMatch == null) return stateCode.FAIL; 
             return (stateCode)fpMatch.stateCode;
         }
         private stateCode enroll(ref FpMatchClass fpMatch)
@@ -408,6 +427,7 @@ namespace FpMatchLib
             fpMatch.handle = Hanndle;
             string json = socketClient.PostJson(fpMatch.JsonSerializationt());
             fpMatch = json.JsonDeserializet<FpMatchClass>();
+            if (fpMatch == null) return stateCode.FAIL;
             return (stateCode)fpMatch.stateCode;
         }   
         private bool OpenDevice()
